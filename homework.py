@@ -33,6 +33,9 @@ TYPE_ERROR_DICT = 'Тип данных ответа не соответсвуе�
 KEY_ERROR_HOMEWORK = 'В ответе не содержится ключ: <homeworks>'
 TYPE_ERROR_LIST = 'Содержимое ответа не соответсвует ожидаемому типу - (list)'
 KEY_ERROR_CURRENT_DATE = 'В ответе не содержится ключ: <current_date>'
+JSON_FORMAT_ERROR = 'Ошибка, ответ не преобразован в json формат!'
+KEY_ERROR_HOMEWORK_NAME = 'Ключ <homework_name> не найден.'
+KEY_ERROR_STATUS = 'Ключь <status> не был найден!'
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -76,12 +79,12 @@ def get_api_answer(timestamp):
             response.raise_for_status()
     except requests.exceptions.RequestException:
         logger.error('Что-то пошло не так на сервере..')
-        raise NotHTTPResponseOK('Ошибка от API')
+        raise NotHTTPResponseOK('Ошибка от API Практикума')
     try:
         json_response = response.json()
     except requests.JSONDecodeError:
-        logger.exception('Ошибка, ответ не преобразован в json формат!')
-        raise NotOKJSONFormat('Ошибка, ответ не преобразовано в json формат!')
+        logger.exception(JSON_FORMAT_ERROR)
+        raise NotOKJSONFormat(JSON_FORMAT_ERROR)
     return json_response
 
 
@@ -110,15 +113,15 @@ def parse_status(homework):
     try:
         homework_status = homework['status']
     except KeyError:
-        logger.exception('Ключь <status> не был найден!')
-        raise KeyError('Не найден ключь')
+        logger.exception(KEY_ERROR_STATUS)
+        raise KeyError(KEY_ERROR_STATUS)
     if homework_status not in HOMEWORK_VERDICTS:
         raise NameError('Это невалидный статус домашней работы!')
     try:
         homework_name = homework['homework_name']
     except KeyError:
-        logger.exception('Ключ <homework_name> не найден.')
-        raise KeyError('Не найден ключь')
+        logger.exception(KEY_ERROR_HOMEWORK_NAME)
+        raise KeyError(KEY_ERROR_HOMEWORK_NAME)
     finally:
         verdict = HOMEWORK_VERDICTS[homework_status]
         return f'Изменился статус проверки работы "{homework_name}". {verdict}'
