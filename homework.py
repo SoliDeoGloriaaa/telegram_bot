@@ -8,7 +8,7 @@ import requests
 import telegram
 from dotenv import load_dotenv
 
-from exceptions import NotHTTPResponseOK
+from exceptions import NotHTTPResponseOK, NotOKJSONFormat
 
 load_dotenv()
 
@@ -29,6 +29,11 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
+TYPE_ERROR_DICT = 'Тип данных ответа не соответсвует ожидаемому - (dict)'
+KEY_ERROR_HOMEWORK = 'В ответе не содержится ключ: <homeworks>'
+TYPE_ERROR_LIST = 'Содержимое ответа не соответсвует ожидаемому типу - (list)'
+KEY_ERROR_CURRENT_DATE = 'В ответе не содержится ключ: <current_date>'
+
 logging.basicConfig(
     level=logging.DEBUG,
     filename='main.log',
@@ -41,7 +46,12 @@ logger = logging.getLogger(__name__)
 
 def check_tokens():
     """Проверка доступности переменных окружения."""
-    return all([PRACTICUM_TOKEN or TELEGRAM_TOKEN or TELEGRAM_CHAT_ID])
+    list_environment_variables = [
+        PRACTICUM_TOKEN,
+        TELEGRAM_TOKEN,
+        TELEGRAM_CHAT_ID
+    ]
+    return all(list_environment_variables)
 
 
 def send_message(bot, message):
@@ -71,26 +81,24 @@ def get_api_answer(timestamp):
         json_response = response.json()
     except requests.JSONDecodeError:
         logger.exception('Ошибка, ответ не преобразован в json формат!')
+        raise NotOKJSONFormat('Ошибка, ответ не преобразовано в json формат!')
     return json_response
 
 
 def check_response(response):
     """Проверка ответа API."""
     if not isinstance(response, dict):
-        logger.error('Тип данных ответа не соответсвует ожидаемому - (dict)')
-        raise TypeError(
-            'Тип данных ответа не соответсвует ожидаемому - (dict)')
+        logger.error(TYPE_ERROR_DICT)
+        raise TypeError(TYPE_ERROR_DICT)
     elif 'homeworks' not in response:
-        logger.error('В ответе не содержится ключ: <homeworks>')
-        raise KeyError('В ответе не содержится ключ: <homeworks>')
+        logger.error(KEY_ERROR_HOMEWORK)
+        raise KeyError(KEY_ERROR_HOMEWORK)
     elif 'current_date' not in response:
-        logger.error('В ответе не содержится ключ: <current_date>')
-        raise KeyError('В ответе не содержится ключ: <current_date>')
+        logger.error(KEY_ERROR_CURRENT_DATE)
+        raise KeyError(KEY_ERROR_CURRENT_DATE)
     elif not isinstance(response['homeworks'], list):
-        logger.error(
-            'Содержимое ответа не соответсвует ожидаемому типу - (list)')
-        raise TypeError(
-            'Содержимое ответа не соответсвует ожидаемому типу - (list)')
+        logger.error(TYPE_ERROR_LIST)
+        raise TypeError(TYPE_ERROR_LIST)
     elif len(response.get('homeworks')) == 0:
         logger.debug('Обновлений домашки нет')
     else:
@@ -103,12 +111,14 @@ def parse_status(homework):
         homework_status = homework['status']
     except KeyError:
         logger.exception('Ключь <status> не был найден!')
+        raise KeyError('Не найден ключь')
     if homework_status not in HOMEWORK_VERDICTS:
         raise NameError('Это невалидный статус домашней работы!')
     try:
         homework_name = homework['homework_name']
     except KeyError:
         logger.exception('Ключ <homework_name> не найден.')
+        raise KeyError('Не найден ключь')
     finally:
         verdict = HOMEWORK_VERDICTS[homework_status]
         return f'Изменился статус проверки работы "{homework_name}". {verdict}'
